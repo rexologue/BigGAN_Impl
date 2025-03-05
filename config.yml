@@ -3,15 +3,15 @@ n_classes: 1
 mode: fine-tune # train
 device: cuda
 seed: 10
-experiment_root: /home/duka/job/biggan/exp
-pretrained_path: /home/duka/job/biggan/model
+experiment_root: /path/where/experiment/will/run
+pretrained_path: /path/to/pretrained/model
 
 ema:
   decay: 0.9999
   start_itr: 0
 
 dataset:
-  annot_path: /home/duka/job/biggan/model/dataset.parquet
+  annot_path: /path/to/dataset.parquet
   use_augments: True
 
 G:
