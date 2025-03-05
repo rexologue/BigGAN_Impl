@@ -1,0 +1,60 @@
+resolution: 128
+n_classes: 1
+mode: fine-tune # train
+device: cuda
+seed: 10
+experiment_root: /home/duka/job/biggan/exp
+pretrained_path: /home/duka/job/biggan/model
+
+ema:
+  decay: 0.9999
+  start_itr: 0
+
+dataset:
+  annot_path: /home/duka/job/biggan/model/dataset.parquet
+  use_augments: True
+
+G:
+  G_ch: 96
+  dim_z: 120
+  initial_resolution: 4
+  resolution_to_apply_attention: "64"
+  num_G_SVs: 1
+  num_G_SV_itrs: 1
+  embeddings_dim: 128
+  G_lr: 0.0001
+  G_B1: 0.0
+  G_B2: 0.999
+  adam_eps: 7
+  BN_eps: 0.00001
+  SN_eps: 0.000001
+  G_init: ortho
+  use_sn: True
+
+D:
+  D_ch: 96
+  D_wide: True
+  resolution_to_apply_attention: "64"
+  num_D_SVs: 1
+  num_D_SV_itrs: 1
+  D_lr: 0.0004
+  D_B1: 0.0
+  D_B2: 0.999
+  adam_eps: 0.000001
+  SN_eps: 0.000001
+  output_dim: 1
+  D_init: ortho
+
+train:
+  num_epochs: 10
+  start_itr: 0
+  batch_size: 16
+  num_D_steps: 1
+  num_D_accumulations: 8
+  num_G_accumulations: 8
+  save_itr: 10000
+  eval_itr: 2000
+  sv_log_interval: 5
+  num_inception_images: 50000
+  G_ortho: 0.0
+  D_ortho: 0.0
