@@ -48,7 +48,7 @@ def run(path_to_config):
   # Prepare experiment state dict, which holds training stats
   exp_state_dict = {'itr': 0, 'epoch': 0, 'best_FID': 999999}
   # Prepare metrics logger (if we fine tune we shouldn't reinitialize)
-  logger = utils.MetricsLogger(config['logs_root'], reinitialize=(config['mode'] == 'train'))
+  logger = utils.MetricsLogger(os.path.join(config['logs_root'], "metrics.json"), reinitialize=(config['mode'] == 'train'))
 
   ####################
   # BUILDINGS MODELS #
@@ -151,12 +151,12 @@ def run(path_to_config):
   # TRAIN LOOP #
   ##############
 
-  print("Beginning training")
+  print("Begin training")
 
   # Train for specified number of epochs, although we mostly track G iterations.
   for epoch in range(exp_state_dict['epoch'], config['train']['num_epochs']): 
 
-    pbar = tqdm(loader)
+    pbar = tqdm(loader, total=len(loader), initial=exp_state_dict['itr'])
     for i, (x, y) in enumerate(pbar):
       # Increment the iteration counter
       exp_state_dict['itr'] += 1
@@ -178,37 +178,61 @@ def run(path_to_config):
         ema.update(exp_state_dict['itr'])
 
       # Every sv_log_interval, log singular values
-      if not (exp_state_dict['itr'] % config['sv_log_interval']):
+      if not (exp_state_dict['itr'] % config['train']['sv_log_interval']):
         sv_dict = {**utils.get_SVs(G, 'G'), **utils.get_SVs(D, 'D')}
       else:
         sv_dict = {}
 
       # Save weights and copies as configured at specified interval
-      if not (exp_state_dict['itr'] % config['save_itr']):
+      if not (exp_state_dict['itr'] % config['train']['save_itr']):
         print(f"Making checkpoint at {exp_state_dict['itr']} iteration")
-        tu.save_and_sample(G, D, G_ema, fixed_z, fixed_y, exp_state_dict, config)
+
+        G.eval()
+        D.eval()
+
+        tu.save_and_sample(
+          G=G, 
+          G_ema=G_ema, 
+          D=D, 
+          fixed_z=fixed_z, 
+          fixed_y=fixed_y, 
+          exp_state_dict=exp_state_dict, 
+          config=config
+        )
+
         torch.save(exp_state_dict, exp_state_dict_path)
 
       # Test every specified interval
-      if not (exp_state_dict['itr'] % config['eval_itr']):
-        print(f"Start validation at step {exp_state_dict['itr']}")
+      if not (exp_state_dict['itr'] % config['train']['eval_itr']):
+        print(f"Start validation at {exp_state_dict['itr']} iteration")
+
         G.eval()
-        fid_value = tu.validate(G, D, G_ema, z_, y_, exp_state_dict, config, fid)
+        D.eval()
+
+        fid_value = tu.validate(
+          G=G, 
+          G_ema=G_ema, 
+          D=D, 
+          exp_state_dict=exp_state_dict, 
+          config=config, 
+          fid_computer=fid
+        )
+
       else:
         fid_value = None
 
-      logger.log(phase='train', itr=exp_state_dict['itr'], fid=fid_value, **metrics, **sv_dict)
+      logger.log(itr=exp_state_dict['itr'], fid=fid_value, **metrics, **sv_dict)
         
     # Increment epoch counter at end of epoch
     exp_state_dict['epoch'] += 1
 
 
 def main():
-  parser = ArgumentParser()
-  parser.add_argument('--cfg_path', type=str,
-    help='Path to configuration file')
-  args = parser.parse_args()
-  run(args.cfg_path)
+  # parser = ArgumentParser()
+  # parser.add_argument('--cfg_path', type=str,
+  #   help='Path to configuration file')
+  # args = parser.parse_args()
+  run('/home/duka/job/biggan/model/config.yml')#args.cfg_path)
 
 if __name__ == '__main__':
   main()

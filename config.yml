@@ -25,7 +25,7 @@ G:
   G_lr: 0.0001
   G_B1: 0.0
   G_B2: 0.999
-  adam_eps: 7
+  adam_eps: 0.000001
   BN_eps: 0.00001
   SN_eps: 0.000001
   G_init: ortho

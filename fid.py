@@ -200,8 +200,8 @@ class FID:
 
         if os.path.exists(data_mu_path) and os.path.exists(data_sigma_path):
             # Загружаем предвычисленные среднее и ковариационную матрицу
-            self.data_mu = np.load(data_mu_path)
-            self.data_sigma = np.load(data_sigma_path)
+            self.data_mu = np.load(data_mu_path)['arr_0']
+            self.data_sigma = np.load(data_sigma_path)['arr_0']
         else:
             # Генерируем датасет реальных изображений для вычисления статистик
             loader = get_loader(config, batch_size=config['train']['batch_size'], start_itr=0, random_use=True)
