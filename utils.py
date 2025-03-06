@@ -331,10 +331,10 @@ def sample_for_all_classes(G: Generator,
   os.makedirs(path, exist_ok=True)
 
   y = torch.arange(num_classes, device='cuda')
-  z_ = torch.randn(num_classes, G.dim_z, device='cuda')
+  z = torch.randn(num_classes, G.dim_z, device='cuda')
   
   with torch.no_grad():
-      o = G(z_, G.shared(y)).cpu()
+      o = G(z, G.shared(y)).cpu()
   
   torchvision.utils.save_image(
       o, 

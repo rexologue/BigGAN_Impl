@@ -104,21 +104,16 @@ def run(path_to_config):
   ###################
   # DATA PROCESSING #
   ###################
-
-  # Compute the full batch size to get it from DataLoader. Gradient accumulation is implemeted
-  # in train loop, so there is no necessity in decreasing batch size here
-  real_batch_size = config['train']['batch_size']
-  accumed_batch_size = real_batch_size * config['train']['num_D_steps'] * config['train']['num_D_accumulations']
   
   loader = get_loader(
     config, 
-    batch_size=accumed_batch_size,
+    batch_size=config['train']['batch_size'],
     start_itr=exp_state_dict['itr']
   )
 
   # Prepare noise and randomly sampled label generators
   z_, y_ = utils.prepare_z_y(
-    batch_size=real_batch_size, 
+    batch_size=config['train']['batch_size'], 
     dim_z=G.dim_z, 
     num_classes=config['n_classes'],
     device=device
