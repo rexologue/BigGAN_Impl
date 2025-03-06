@@ -216,11 +216,11 @@ def run(path_to_config):
 
 
 def main():
-  # parser = ArgumentParser()
-  # parser.add_argument('--cfg_path', type=str,
-  #   help='Path to configuration file')
-  # args = parser.parse_args()
-  run('/home/duka/job/biggan/model/config.yml')#args.cfg_path)
+  parser = ArgumentParser()
+  parser.add_argument('--cfg_path', type=str,
+    help='Path to configuration file')
+  args = parser.parse_args()
+  run(args.cfg_path)
 
 if __name__ == '__main__':
   main()
