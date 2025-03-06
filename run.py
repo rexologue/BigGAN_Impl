@@ -116,7 +116,7 @@ def run(path_to_config):
     start_itr=exp_state_dict['itr']
   )
 
-  # Prepare noise and randomly sampled label arrays
+  # Prepare noise and randomly sampled label generators
   z_, y_ = utils.prepare_z_y(
     batch_size=real_batch_size, 
     dim_z=G.dim_z, 
@@ -125,27 +125,20 @@ def run(path_to_config):
   )
 
   # Prepare a fixed z & y to see individual sample evolution throghout training
-  fixed_z, fixed_y = utils.prepare_z_y(
-    batch_size=real_batch_size, 
-    dim_z=G.dim_z, 
-    num_classes=config['n_classes'],
-    device=device
-  )
-
-  fixed_z.sample()
-  fixed_y.sample()
+  fixed_z = z_.sample()
+  fixed_y = y_.sample()
 
   ##################
   # FID PREPARINGS #
   ##################
-  sampler = functools.partial(
+  sample_function = functools.partial(
     utils.sample,
     G=G_ema,
     z_=z_, 
     y_=y_
   )
 
-  fid = FID(config, sampler)
+  fid = FID(config, sample_function)
 
   ##############
   # TRAIN LOOP #

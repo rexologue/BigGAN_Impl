@@ -116,7 +116,7 @@ def calculate_frechet_distance(mu1: torch.Tensor,
     return out
 
 
-def accumulate_inception_activations(sampler: Callable, 
+def accumulate_inception_activations(sample_function: Callable, 
                                      net: torch.nn.Module, 
                                      num_inception_images=50000):
     """
@@ -126,7 +126,7 @@ def accumulate_inception_activations(sampler: Callable,
     
     Параметры:
     ----------
-    sampler : Callable
+    sample_function : Callable
         Функция-семплер, которая возвращает изображения и соответствующие метки.
     net : torch.nn.Module
         Inception-сеть, используемая для извлечения активаций.
@@ -144,7 +144,7 @@ def accumulate_inception_activations(sampler: Callable,
 
     while (torch.cat(logits, 0).shape[0] if len(logits) else 0) < num_inception_images:
         with torch.no_grad():
-            images, labels_val = sampler()
+            images, labels_val = sample_function()
             pool_val, logits_val = net(images.float())
             pool += [pool_val]
             logits += [F.softmax(logits_val, 1)]
@@ -184,13 +184,14 @@ class FID:
     ----------
     config : dict
         Конфигурационный словарь с настройками модели и путями к файлам.
-    sampler : Callable
+    sample_function : Callable
         Функция-сэмплер, генерирующая батчи изображений.
     """
     def __init__(self, 
                  config: dict, 
-                 sampler: Callable):
-        self.sampler = sampler
+                 sample_function: Callable):
+        
+        self.sample_function = sample_function
         self.device = config['device']
         self.net = load_inception().to(self.device)
         self.num_inception_images = config['train']['num_inception_images']
@@ -231,7 +232,7 @@ class FID:
         """
         Вычисляет FID для сгенерированных изображений.
         
-        1. Генерирует сэмплы с помощью переданного `sampler`.
+        1. Генерирует сэмплы с помощью переданной `sample_function`.
         2. Вычисляет среднее и ковариацию активаций генератора.
         3. Использует `calculate_frechet_distance()` для вычисления FID.
         
@@ -240,7 +241,7 @@ class FID:
         float
             Вычисленное значение FID.
         """
-        pool, logits, labels = accumulate_inception_activations(self.sampler, self.net, self.num_inception_images)
+        pool, logits, labels = accumulate_inception_activations(self.sample_function, self.net, self.num_inception_images)
 
         mu, sigma = torch.mean(pool, 0), covariance_matrix(pool, rowvar=False)
         fid = calculate_frechet_distance(mu, sigma, torch.tensor(self.data_mu).float().to(self.device), torch.tensor(self.data_sigma).float().to(self.device))

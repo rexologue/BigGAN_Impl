@@ -26,8 +26,8 @@ def train(G: Generator,
     D.optim.zero_grad()
 
     # На сколько частей разбить x и y?
-    x = torch.split(x, config['train']['batch_size'])
-    y = torch.split(y, config['train']['batch_size'])
+    xs = torch.split(x, config['train']['batch_size'])
+    ys = torch.split(y, config['train']['batch_size'])
     counter = 0
     
     # Замораживаем генератор
@@ -43,16 +43,12 @@ def train(G: Generator,
 
       # Проходим через дискримнатор num_D_accumulations раз
       for accumulation_index in range(config['train']['num_D_accumulations']):
-        # Сэмплируем новые случайные латентные вектора и метки
-        z_.sample()
-        y_.sample()
-
-        # Forward pass 
+        # Сэмплируем новые случайные латентные вектора и метки forward pass 
         D_fake, D_real = gan_model.forward_D(
-          z=z_, 
-          gy=y_, 
-          x=x[counter], 
-          dy=y[counter]
+          z=z_.sample(), 
+          gy=y_.sample(), 
+          x=xs[counter], 
+          dy=ys[counter]
         )
          
         # Подсчитываем компопенты лосса дискриминатора, усредняем их и делим на количетсво аккумуляций
@@ -81,14 +77,10 @@ def train(G: Generator,
     
     # Проходим через генератор num_G_accumulations раз
     for accumulation_index in range(config['train']['num_G_accumulations']):   
-      # Сэмплируем новые случайные латентные вектора и метки 
-      z_.sample()
-      y_.sample()
-
-      # Forward pass 
+      # Сэмплируем новые случайные латентные вектора и метки, делаем forward pass 
       D_fake = gan_model.forward_G(
-        z=z_, 
-        gy=y_
+        z=z_.sample(), 
+        gy=y_.sample()
       )
       
       # Подсчитываем лосс генератора, усредняя его делением на количетсво аккумуляций
@@ -116,8 +108,8 @@ def train(G: Generator,
 def save_and_sample(G: Generator, 
                     G_ema: Generator, 
                     D: Discriminator, 
-                    fixed_z: utils.Distribution, 
-                    fixed_y: utils.Distribution, 
+                    fixed_z: torch.Tensor, 
+                    fixed_y: torch.Tensor, 
                     exp_state_dict: dict, 
                     config: dict):
     """
@@ -136,9 +128,9 @@ def save_and_sample(G: Generator,
         Экспоненциально усреднённая версия генератора (EMA).
     D : Discriminator
         Дискриминаторная модель.
-    fixed_z : utils.Distribution
+    fixed_z : torch.Tensor
         Фиксированный латентный вектор `z` для визуализации.
-    fixed_y : utils.Distribution
+    fixed_y : torch.Tensor
         Фиксированные метки `y` для визуализации.
     exp_state_dict : dict
         Словарь состояния эксперимента (содержит текущую итерацию и метрики).

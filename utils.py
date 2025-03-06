@@ -185,192 +185,125 @@ class MetricsLogger:
         f.write(json.dumps(record, ensure_ascii=True) + '\n')
 
 
-class Distribution(torch.Tensor):
-  """
-  Расширенный тензор для удобного сэмплирования из заданного распределения.
-
-  Данный класс позволяет создавать тензоры, из которых можно легко 
-  сэмплировать значения, используя нормальное или категориальное распределение.
-  
-  Основные возможности:
-  ----------------------
-  1. Поддержка различных распределений:
-      - `normal` (нормальное распределение с параметрами `mean` и `var`).
-      - `categorical` (категориальное распределение с числом классов `num_categories`).
-  
-  2. Простая генерация случайных значений:
-      - Метод `sample()` позволяет сэмплировать значения в соответствии с 
-        заданным распределением.
-      
-  3. Поддержка перевода на другие устройства и типы данных:
-      - Метод `to()` сохраняет параметры распределения при переводе тензора.
-      
-  Пример использования:
-  ---------------------
-  .. code-block:: python
-      
-      dist = Distribution(10)  # Создание тензора
-      dist.init_distribution('normal', mean=0.0, var=1.0)  # Инициализация
-      samples = dist.sample()  # Получение выборки
-  
-  Параметры:
-  ----------
-  dist_type : str
-      Тип распределения (`'normal'` или `'categorical'`).
-  mean : float, optional
-      Среднее значение для нормального распределения (по умолчанию 0.0).
-  var : float, optional
-      Дисперсия для нормального распределения (по умолчанию 1.0).
-  num_categories : int, optional
-      Количество классов для категориального распределения (по умолчанию 2).
-  """
-  def __new__(cls, *args, **kwargs):
-    return super().__new__(cls, *args, **kwargs)
-
-
-  def init_distribution(self, 
-                        dist_type: Literal['normal', 'categorical'], 
-                        **kwargs):
+class Distribution:
     """
-    Инициализирует параметры распределения для тензора.
-    
+    Класс для генерации случайных значений из заданного распределения.
+
+    Поддерживаются:
+    - `normal` (нормальное распределение, среднее `0.0`, дисперсия `0.02`).
+    - `categorical` (категориальное распределение с заданным числом классов).
+
     Параметры:
     ----------
     dist_type : str
         Тип распределения (`'normal'` или `'categorical'`).
-    **kwargs : dict
-        Дополнительные параметры распределения:
-        - `mean` (среднее) и `var` (дисперсия) для нормального распределения.
-        - `num_categories` (количество классов) для категориального распределения.
+    shape : tuple
+        Размерность тензора выборки.
+    num_categories : int, optional
+        Количество классов (только для `categorical`).
+    device : str, optional
+        Устройство для размещения тензоров (`'cuda'` или `'cpu'`, по умолчанию `'cuda'`).
     """
-    self.dist_type = dist_type
-    self.dist_kwargs = kwargs
+    def __init__(self, 
+                    dist_type: Literal['normal', 'categorical'], 
+                    shape: tuple, 
+                    num_categories: int = None,
+                    device: Literal['cuda', 'cpu'] = 'cuda'):
+        self.dist_type = dist_type
+        self.shape = shape
+        self.device = device
 
-    if self.dist_type == 'normal':
-        self.mean = kwargs.get('mean', 0.0)
-        self.var = kwargs.get('var', 1.0)
+        if dist_type == 'categorical':
+            self.num_categories = num_categories
 
-    elif self.dist_type == 'categorical':
-        self.num_categories = kwargs.get('num_categories', 2)
+        if dist_type not in ['normal', 'categorical']:
+            raise ValueError(f"Unknown distribution type: {dist_type}")
 
-    else:
-        raise ValueError(f"Unknown distribution type: {dist_type}")
-
-
-  def sample(self):
-    """
-    Генерирует выборку случайных значений в соответствии с заданным распределением.
-    
-    Возвращает:
-    -----------
-    torch.Tensor
-        Тензор случайных значений заданного распределения.
-    """
-    if self.dist_type == 'normal':
-        return torch.normal(self.mean, self.var, size=self.shape)
-    elif self.dist_type == 'categorical':
-        return torch.randint(0, self.num_categories, size=self.shape)
-    else:
-        raise ValueError(f"Unknown distribution type: {self.dist_type}")
-    
-  
-  def to(self, *args, **kwargs):
-    """
-    Переводит тензор на другое устройство или в другой формат данных, 
-    сохраняя параметры распределения.
-    
-    Параметры:
-    ----------
-    *args, **kwargs :
-        Аргументы, передаваемые в стандартный метод `torch.Tensor.to()`.
-    
-    Возвращает:
-    -----------
-    Distribution
-        Новый объект `Distribution`, приведённый к указанному устройству/формату.
-    """
-    new_obj = Distribution(self)
-    new_obj.init_distribution(self.dist_type, **self.dist_kwargs)
-    
-    # Вызов стандартного метода .to()
-    temp = super().to(*args, **kwargs)
-    
-    # Если распределение категориальное, конвертируем тензор в LongTensor
-    if self.dist_type == 'categorical':
-        temp = temp.long()
-    
-    new_obj.data = temp
-    
-    return new_obj
+    def sample(self) -> torch.Tensor:
+        """
+        Генерирует выборку случайных значений в соответствии с заданным распределением.
+        
+        Возвращает:
+        -----------
+        torch.Tensor
+            Тензор случайных значений заданного распределения.
+        """
+        if self.dist_type == 'normal':
+            return torch.normal(0.0, 1.0, size=self.shape).to(self.device)
+        
+        if self.dist_type == 'categorical':
+            return torch.randint(0, self.num_categories, size=self.shape).to(self.device)
 
 
 def prepare_z_y(batch_size: int, 
                 dim_z: int, 
                 num_classes: int, 
-                device='cuda', 
-                z_var=1.0) -> Tuple[Distribution, Distribution]:
-  """
-  Подготавливает тензоры `z` и `y` для генератора.
-  
-  `z` — латентный вектор, инициализируется как нормальное распределение.
-  `y` — метки классов, инициализируется как категориальное распределение.
+                device='cuda') -> Tuple[Distribution, Distribution]:
+    """
+    Подготавливает тензоры `z` и `y` для генератора.
+    
+    `z` — латентный вектор, инициализируется как нормальное распределение.
+    `y` — метки классов, инициализируется как категориальное распределение.
 
-  Параметры:
-  ----------
-  batch_size : int
-      Размер батча.
-  dim_z : int
-      Размерность латентного вектора `z`.
-  num_classes : int
-      Количество классов.
-  device : str, optional
-      Устройство для размещения тензоров (по умолчанию `'cuda'`).
-  z_var : float, optional
-      Дисперсия для нормального распределения `z` (по умолчанию `1.0`).
+    Параметры:
+    ----------
+    batch_size : int
+        Размер батча.
+    dim_z : int
+        Размерность латентного вектора `z`.
+    num_classes : int
+        Количество классов.
+    device : str, optional
+        Устройство для размещения тензоров (по умолчанию `'cuda'`).
 
-  Возвращает:
-  -----------
-  Tuple[Distribution, Distribution]
-      Кортеж из тензоров `z_` и `y_`.
-  """
-  z_ = Distribution(torch.randn(batch_size, dim_z, requires_grad=False))
-  z_.init_distribution('normal', mean=0, var=z_var)
-  z_ = z_.to(device)   
+    Возвращает:
+    -----------
+    Tuple[Distribution, Distribution]
+        Кортеж из объектов `z_` (латентный вектор) и `y_` (классовые метки).
+    """
+    z_ = Distribution(
+        dist_type='normal', 
+        shape=(batch_size, dim_z), 
+        device=device
+    )
 
-  y_ = Distribution(torch.zeros(batch_size, requires_grad=False))
-  y_.init_distribution('categorical', num_categories=num_classes)
-  y_ = y_.to(device)
+    y_ = Distribution(
+        dist_type='categorical', 
+        shape=(batch_size,),  
+        device=device,
+        num_categories=num_classes
+    )
 
-  return z_, y_
+    return z_, y_
 
 
 def sample(G: Generator, 
            z_: Distribution, 
-           y_: Distribution) -> Tuple[torch.Tensor, Distribution]:
-  """
-  Генерирует изображения с помощью генератора `G`, используя входные `z_` и `y_`.
+           y_: Distribution) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Генерирует изображения с помощью генератора `G`, используя входные `z_` и `y_`.
 
-  Параметры:
-  ----------
-  G : Generator
-      Генераторная модель, принимающая `z_` и `y_` в качестве входных данных.
-  z_ : Distribution
-      Латентный вектор сэмплированных значений.
-  y_ : Distribution
-      Классовые метки сэмплированных значений.
-  
-  Возвращает:
-  -----------
-  Tuple[torch.Tensor, Distribution]
-      - `G_z` — сгенерированные изображения.
-      - `y_` — обновленные метки классов.
-  """
-  with torch.no_grad():
-      z_.sample()
-      y_.sample()
-      G_z = G(z_, G.shared(y_))
-  
-  return G_z, y_
+    Параметры:
+    ----------
+    G : Generator
+        Генераторная модель, принимающая `z_` и `y_` в качестве входных данных.
+    z_ : Distribution
+        Генератор латентного вектора сэмплированных значений.
+    y_ : Distribution
+        Генератор классовых меток сэмплированных значений.
+    
+    Возвращает:
+    -----------
+    Tuple[torch.Tensor, torch.Tensor]
+        - `G_z` — сгенерированные изображения.
+        - `y` — обновленные метки классов.
+    """
+    with torch.no_grad():
+        z = z_.sample()
+        y = y_.sample()
+        G_z = G(z, G.shared(y))
+    
+    return G_z, y
 
 
 def sample_for_all_classes(G: Generator, 
