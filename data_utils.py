@@ -183,11 +183,11 @@ def get_loader(config,
   if config['dataset']['use_augments']:
     transform_list.extend([
       transforms.RandomHorizontalFlip(p=0.5),  # Случайное отражение по горизонтали
-      transforms.RandomResizedCrop(size=config['resolution'], scale=(0.8, 1.0)),  # Рандомное обрезание
+      transforms.RandomResizedCrop(size=(config['resolution'], config['resolution']), scale=(0.8, 1.0)),  # Рандомное обрезание
       transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1)  # Цветовые изменения
     ]) 
   else:
-    transform_list.append(transforms.Resize(config['resolution']))  # Изменение размера без аугментаций
+    transform_list.append(transforms.Resize((config['resolution'], config['resolution'])))  # Изменение размера без аугментаций
   
   # Преобразование в тензор и нормализация
   transform_list.extend([
