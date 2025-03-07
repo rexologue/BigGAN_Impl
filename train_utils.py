@@ -234,30 +234,30 @@ def save_and_sample(G: Generator,
     if len(exp_state_dict['saved_ckps']) > 6:
       # Удаляем первые два элемента (самые старые чекпоинты)
       for ckp in exp_state_dict['saved_ckps'][:2]:  # Берём первые два элемента
-          # Удаляем директорию
-          shutil.rmtree(ckp)
+        # Удаляем директорию
+        shutil.rmtree(ckp)
     
     # Удаляем из списка
     exp_state_dict['saved_ckps'] = exp_state_dict['saved_ckps'][2:]
     
     # Генерация изображений с фиксированными `z` и `y`
     with torch.no_grad():
-        fixed_Gz = G_ema(fixed_z, G_ema.shared(fixed_y))
+      fixed_Gz = G_ema(fixed_z, G_ema.shared(fixed_y))
     
     image_filename = os.path.join(config['samples_root'], f"fixed_samples_{exp_state_dict['itr']}.jpg")
     torchvision.utils.save_image(
-        fixed_Gz.float().cpu(), 
-        image_filename,
-        nrow=int(fixed_Gz.shape[0] ** 0.5), 
-        normalize=True
+      fixed_Gz.float().cpu(), 
+      image_filename,
+      nrow=int(fixed_Gz.shape[0] ** 0.5), 
+      normalize=True
     )
     
     # Генерация примеров изображений для всех классов
     utils.sample_for_all_classes(
-        G_ema,
-        config['n_classes'],
-        config['samples_root'],
-        exp_state_dict['itr']
+      G_ema,
+      config['n_classes'],
+      config['samples_root'],
+      exp_state_dict['itr']
     )
 
 
@@ -298,13 +298,19 @@ def validate(G: Generator,
     
     # Проверяем, улучшилась ли метрика
     if exp_state_dict['best_FID'] > fid:
-        print(f"FID value improved on {exp_state_dict['itr']} iteration. Saving checkpoint...")
-        
-        best_path = os.path.join(config['weights_root'], f"best_iter_{exp_state_dict['itr']}_fid_{round(fid)}")
-        os.makedirs(best_path, exist_ok=True)
-        
-        exp_state_dict['best_FID'] = fid
-        utils.save_weigths(G, G_ema, D, best_path)
+      print(f"FID value improved on {exp_state_dict['itr']} iteration. Saving checkpoint...")
+      
+      best_path = os.path.join(config['weights_root'], "best_perfomance")
+
+      shutil.rmtree(best_path)
+      os.mkdir(best_path)
+      
+      # Сохраняем веса и результат
+      exp_state_dict['best_FID'] = fid
+      utils.save_weigths(G, G_ema, D, best_path)
+
+      with open(os.path.join(best_path, 'stats.txt'), 'w', encoding='utf8') as f:
+        f.write(f"Model's perfomance: {fid}\nIteration: {exp_state_dict['itr']}")
     
     return fid
 
