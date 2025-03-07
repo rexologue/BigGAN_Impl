@@ -240,8 +240,7 @@ class FID:
         pool, logits, labels = accumulate_inception_activations(
             sample_function=self.sample_function,
             net=self.net,
-            num_inception_images=self.num_inception_images,
-            device=self.device
+            num_inception_images=self.num_inception_images
         )
 
         # Вычисляем среднее и ковариацию в PyTorch
