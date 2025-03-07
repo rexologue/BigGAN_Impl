@@ -54,6 +54,7 @@ train:
   num_G_accumulations: 8
   save_itr: 10000
   eval_itr: 2000
+  sample_itr: 2
   sv_log_interval: 5
   num_inception_images: 50000
   G_ortho: 0.0

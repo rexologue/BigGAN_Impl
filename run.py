@@ -171,6 +171,15 @@ def run(path_to_config):
       else:
         sv_dict = {}
 
+      if not (exp_state_dict['itr'] % config['train']['sample_itr']):
+        tu.sample(
+          G_ema=G_ema,
+          fixed_z=fixed_z, 
+          fixed_y=fixed_y,
+          exp_state_dict=exp_state_dict, 
+          config=config
+        )
+
       # Save weights and copies as configured at specified interval
       if not (exp_state_dict['itr'] % config['train']['save_itr']):
         print(f"Making checkpoint at {exp_state_dict['itr']} iteration")
@@ -178,12 +187,10 @@ def run(path_to_config):
         G.eval()
         D.eval()
 
-        tu.save_and_sample(
+        tu.checkpoint(
           G=G, 
           G_ema=G_ema, 
           D=D, 
-          fixed_z=fixed_z, 
-          fixed_y=fixed_y, 
           exp_state_dict=exp_state_dict, 
           config=config
         )

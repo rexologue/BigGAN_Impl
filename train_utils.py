@@ -189,76 +189,97 @@ def train(G: Generator,
     return out
 
 
-def save_and_sample(G: Generator, 
-                    G_ema: Generator, 
-                    D: Discriminator, 
-                    fixed_z: torch.Tensor, 
-                    fixed_y: torch.Tensor, 
-                    exp_state_dict: dict, 
-                    config: dict):
-    """
-    Сохраняет веса моделей и генерирует примеры изображений для визуализации.
-    
-    Функция выполняет:
-    1. Сохранение весов генератора, дискриминатора и EMA-версии генератора.
-    2. Генерацию изображений с фиксированными `z` и `y`.
-    3. Создание сэмплов для всех классов.
+def checkpoint(G: Generator, 
+               G_ema: Generator, 
+               D: Discriminator, 
+               exp_state_dict: dict, 
+               config: dict):
+  """
+  Сохраняет веса моделей и удаляет старые чекпоинты.
+  
+  Функция выполняет:
+  1. Сохранение весов генератора, дискриминатора и EMA-версии генератора.
+  2. При накоплении достаточно большого количества чекпоинтов, удаляет старые, поддерживая
+     постоянное их количество равным 5.
 
-    Параметры:
-    ----------
-    G : Generator
-        Генераторная модель.
-    G_ema : Generator
-        Экспоненциально усреднённая версия генератора (EMA).
-    D : Discriminator
-        Дискриминаторная модель.
-    fixed_z : torch.Tensor
-        Фиксированный латентный вектор `z` для визуализации.
-    fixed_y : torch.Tensor
-        Фиксированные метки `y` для визуализации.
-    exp_state_dict : dict
-        Словарь состояния эксперимента (содержит текущую итерацию и метрики).
-    config : dict
-        Конфигурационный словарь с путями для сохранения и параметрами модели.
-    """
-    # Создание директории для сохранения весов
-    weights_save_path = os.path.join(config['weights_root'], f"iter_{exp_state_dict['itr']}")
-    os.mkdir(weights_save_path)
+  Параметры:
+  ----------
+  G : Generator
+      Генераторная модель.
+  G_ema : Generator
+      Экспоненциально усреднённая версия генератора (EMA).
+  D : Discriminator
+      Дискриминаторная модель.
+  exp_state_dict : dict
+      Словарь состояния эксперимента (содержит текущую итерацию и метрики).
+  config : dict
+      Конфигурационный словарь с путями для сохранения и параметрами модели.
+  """
+  # Создание директории для сохранения весов
+  weights_save_path = os.path.join(config['weights_root'], f"iter_{exp_state_dict['itr']}")
+  os.mkdir(weights_save_path)
 
-    # Сохранение весов моделей
-    utils.save_weigths(G, G_ema, D, weights_save_path)
+  # Сохранение весов моделей
+  utils.save_weigths(G, G_ema, D, weights_save_path)
 
-    exp_state_dict['saved_ckps'].append(weights_save_path)
+  exp_state_dict['saved_ckps'].append(weights_save_path)
 
-    # Если количество сохранённых чекпоинтов превышает 6
-    if len(exp_state_dict['saved_ckps']) > 6:
-      # Удаляем первые два элемента (самые старые чекпоинты)
-      for ckp in exp_state_dict['saved_ckps'][:2]:  # Берём первые два элемента
-        # Удаляем директорию
-        shutil.rmtree(ckp)
-    
+  # Если количество сохранённых чекпоинтов превышает 6
+  if len(exp_state_dict['saved_ckps']) > 6:
+    # Удаляем первые два элемента (самые старые чекпоинты)
+    for ckp in exp_state_dict['saved_ckps'][:2]:  # Берём первые два элемента
+      # Удаляем директорию
+      shutil.rmtree(ckp)
+  
     # Удаляем из списка
     exp_state_dict['saved_ckps'] = exp_state_dict['saved_ckps'][2:]
-    
-    # Генерация изображений с фиксированными `z` и `y`
-    with torch.no_grad():
-      fixed_Gz = G_ema(fixed_z, G_ema.shared(fixed_y))
-    
-    image_filename = os.path.join(config['samples_root'], f"fixed_samples_{exp_state_dict['itr']}.jpg")
-    torchvision.utils.save_image(
-      fixed_Gz.float().cpu(), 
-      image_filename,
-      nrow=int(fixed_Gz.shape[0] ** 0.5), 
-      normalize=True
-    )
-    
-    # Генерация примеров изображений для всех классов
-    utils.sample_for_all_classes(
-      G_ema,
-      config['n_classes'],
-      config['samples_root'],
-      exp_state_dict['itr']
-    )
+
+
+def sample(G_ema: Generator, 
+           fixed_z: torch.Tensor, 
+           fixed_y: torch.Tensor, 
+           exp_state_dict: dict, 
+           config: dict):
+  """
+  Генерирует примеры изображений для визуализации.
+  
+  Функция выполняет:
+  1. Генерацию изображений с фиксированными `z` и `y`.
+  2. Создание сэмплов для всех классов.
+
+  Параметры:
+  ----------
+  G_ema : Generator
+      Экспоненциально усреднённая версия генератора (EMA).
+  fixed_z : torch.Tensor
+      Фиксированный латентный вектор `z` для визуализации.
+  fixed_y : torch.Tensor
+      Фиксированные метки `y` для визуализации.
+  exp_state_dict : dict
+      Словарь состояния эксперимента (содержит текущую итерацию и метрики).
+  config : dict
+      Конфигурационный словарь с путями для сохранения и параметрами модели.
+  """
+  # Генерация изображений с фиксированными `z` и `y`
+  with torch.no_grad():
+    fixed_Gz = G_ema(fixed_z, G_ema.shared(fixed_y))
+  
+  image_filename = os.path.join(config['samples_root'], f"fixed_samples_{exp_state_dict['itr']}.jpg")
+  torchvision.utils.save_image(
+    fixed_Gz.float().cpu(), 
+    image_filename,
+    nrow=int(fixed_Gz.shape[0] ** 0.5), 
+    normalize=True
+  )
+  
+  # Генерация примеров изображений для всех классов
+  utils.sample_for_all_classes(
+    G_ema,
+    config['n_classes'],
+    config['samples_root'],
+    exp_state_dict['itr']
+  )
+  
 
 
 def validate(G: Generator, 
@@ -304,7 +325,7 @@ def validate(G: Generator,
 
       if os.path.exists(best_path):
         shutil.rmtree(best_path)
-        
+
       os.mkdir(best_path)
       
       # Сохраняем веса и результат
