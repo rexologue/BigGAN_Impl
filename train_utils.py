@@ -2,6 +2,7 @@
 Functions for the main loop of training different conditional image models
 '''
 import os
+import shutil
 
 import torch
 import torchvision
@@ -226,6 +227,18 @@ def save_and_sample(G: Generator,
 
     # Сохранение весов моделей
     utils.save_weigths(G, G_ema, D, weights_save_path)
+
+    exp_state_dict['saved_ckps'].append(weights_save_path)
+
+    # Если количество сохранённых чекпоинтов превышает 6
+    if len(exp_state_dict['saved_ckps']) > 6:
+      # Удаляем первые два элемента (самые старые чекпоинты)
+      for ckp in exp_state_dict['saved_ckps'][:2]:  # Берём первые два элемента
+          # Удаляем директорию
+          shutil.rmtree(ckp)
+    
+    # Удаляем из списка
+    exp_state_dict['saved_ckps'] = exp_state_dict['saved_ckps'][2:]
     
     # Генерация изображений с фиксированными `z` и `y`
     with torch.no_grad():

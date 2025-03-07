@@ -46,7 +46,7 @@ def run(path_to_config):
   torch.backends.cudnn.benchmark = True
 
   # Prepare experiment state dict, which holds training stats
-  exp_state_dict = {'itr': 0, 'epoch': 0, 'best_FID': 999999}
+  exp_state_dict = {'itr': 0, 'epoch': 0, 'best_FID': 999999, 'saved_ckps': []}
   # Prepare metrics logger (if we fine tune we shouldn't reinitialize)
   logger = utils.MetricsLogger(os.path.join(config['logs_root'], "metrics.json"), reinitialize=(config['mode'] == 'train'))
 
