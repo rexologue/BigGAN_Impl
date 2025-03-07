@@ -302,7 +302,9 @@ def validate(G: Generator,
       
       best_path = os.path.join(config['weights_root'], "best_perfomance")
 
-      shutil.rmtree(best_path)
+      if os.path.exists(best_path):
+        shutil.rmtree(best_path)
+        
       os.mkdir(best_path)
       
       # Сохраняем веса и результат
