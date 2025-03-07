@@ -7,8 +7,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.models.inception import inception_v3, Inception_V3_Weights
 
-from biggan.data_utils import get_loader
-from biggan.math_functions import covariance_matrix, sqrt_newton_schulz
+from data_utils import get_loader
+from math_functions import covariance_matrix, sqrt_newton_schulz
 
 
 class WrapInception(nn.Module):
