@@ -1,4 +1,5 @@
 import os
+from tqdm import tqdm 
 from typing import Callable
 
 import torch
@@ -6,11 +7,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.models.inception import inception_v3, Inception_V3_Weights
 
-import numpy as np
-from tqdm import tqdm 
-
-from data_utils import get_loader
-from math_functions import covariance_matrix, sqrt_newton_schulz
+from biggan.data_utils import get_loader
+from biggan.math_functions import covariance_matrix, sqrt_newton_schulz
 
 
 class WrapInception(nn.Module):
@@ -196,36 +194,32 @@ class FID:
         self.net = load_inception().to(self.device)
         self.num_inception_images = config['train']['num_inception_images']
 
-        data_mu_path = os.path.join(config['inception_root'], 'data_mu.npz')
-        data_sigma_path = os.path.join(config['inception_root'], 'data_sigma.npz')
+        # Пути к файлам, где будем хранить/искать статистики
+        data_mu_path = os.path.join(config['inception_root'], 'data_mu.pth')
+        data_sigma_path = os.path.join(config['inception_root'], 'data_sigma.pth')
 
+        # Если статистики уже существуют, загружаем их
         if os.path.exists(data_mu_path) and os.path.exists(data_sigma_path):
-            # Загружаем предвычисленные среднее и ковариационную матрицу
-            self.data_mu = np.load(data_mu_path)['arr_0']
-            self.data_sigma = np.load(data_sigma_path)['arr_0']
+            # Загружаем предвычисленные среднее и ковариационную матрицу 
+            self.data_mu = torch.load(data_mu_path).to(self.device)       # shape [D]
+            self.data_sigma = torch.load(data_sigma_path).to(self.device) # shape [D, D]
         else:
             # Генерируем датасет реальных изображений для вычисления статистик
-            loader = get_loader(config, batch_size=config['train']['batch_size'], start_itr=0, random_use=True)
+            loader = get_loader(config, 
+                                batch_size=config['train']['batch_size'], 
+                                start_itr=0, 
+                                random_use=True)
             
             print("Start calculating means and covariances for FID...")
             
-            pool, logits, labels = [], [], []
-            for i, (x, y) in enumerate(tqdm(loader)):
-                x = x.to(self.device)
+            # Вместо накопления всех активаций в pool мы считаем статистики "онлайн".
+            # Если датасет большой, это позволяет избежать нехватки памяти (RAM).
+            self.data_mu, self.data_sigma = self._compute_dataset_stats_streaming(loader)
 
-                with torch.no_grad():
-                    pool_val, logits_val = self.net(x)
-                    pool += [np.asarray(pool_val.cpu())]
-                    logits += [np.asarray(F.softmax(logits_val, 1).cpu())]
-                    labels += [np.asarray(y.cpu())]
-
-            pool, logits, labels = [np.concatenate(item, 0) for item in [pool, logits, labels]]
-
-            # Вычисляем среднее значение и ковариацию
-            self.data_mu, self.data_sigma = np.mean(pool, axis=0), np.cov(pool, rowvar=False)
             print('Saving calculated means and covariances to disk...')
-            np.savez(data_mu_path, self.data_mu)
-            np.savez(data_sigma_path, self.data_sigma)
+            # Переводим результат на CPU и сохраняем
+            torch.save(self.data_mu.cpu(), data_mu_path)
+            torch.save(self.data_sigma.cpu(), data_sigma_path)
 
 
     def __call__(self) -> float:
@@ -241,22 +235,84 @@ class FID:
         float
             Вычисленное значение FID.
         """
-        pool, logits, labels = accumulate_inception_activations(self.sample_function, self.net, self.num_inception_images)
+        # Сбор активаций для сгенерированных изображений
+        # (примерно как в вашем accumulate_inception_activations)
+        pool, logits, labels = accumulate_inception_activations(
+            sample_function=self.sample_function,
+            net=self.net,
+            num_inception_images=self.num_inception_images,
+            device=self.device
+        )
 
-        mu, sigma = torch.mean(pool, 0), covariance_matrix(pool, rowvar=False)
-        fid = calculate_frechet_distance(mu, sigma, torch.tensor(self.data_mu).float().to(self.device), torch.tensor(self.data_sigma).float().to(self.device))
-        fid = float(fid.cpu().numpy())
+        # Вычисляем среднее и ковариацию в PyTorch
+        mu = pool.mean(dim=0)  # [D]
+        sigma = covariance_matrix(pool, rowvar=False)  # [D, D]
+
+        # Перекладываем сохранённые статистики на нужное устройство
+        real_mu = self.data_mu.to(self.device).float()
+        real_sigma = self.data_sigma.to(self.device).float()
+
+        # Вычисляем Frechet Distance
+        fid = calculate_frechet_distance(mu, sigma, real_mu, real_sigma)
+        fid = float(fid.cpu().item())
 
         # Освобождаем память
-        del mu, sigma, pool, logits, labels
-
+        del mu, sigma, pool, logits, labels, real_mu, real_sigma
         return fid
-       
-                
-               
-
-               
 
 
+    def _compute_dataset_stats_streaming(self, loader):
+        """
+        Вычисляет среднее и ковариацию активаций Inception для реальных данных в режиме стриминга,
+        не сохраняя весь 'pool' в памяти.
 
+        Параметры:
+        ----------
+        loader : DataLoader
+            Даталоудер с реальными изображениями.
 
+        Возвращает:
+        -----------
+        mean : torch.Tensor, shape [D]
+            Среднее значение активаций.
+        cov : torch.Tensor, shape [D, D]
+            Ковариационная матрица активаций (Bessel's correction).
+        """
+        self.net.eval()
+        sum_features = None
+        sum_features_squared = None
+        n_samples = 0
+
+        # Без вычисления градиентов
+        with torch.no_grad():
+            for x, _ in tqdm(loader):
+                x = x.to(self.device)
+                pool_val, _ = self.net(x)  # pool_val shape = [B, D]
+
+                B, D = pool_val.shape
+                if sum_features is None:
+                    # Инициализируем аккумуляторы
+                    sum_features = torch.zeros(D, device=self.device)
+                    sum_features_squared = torch.zeros(D, D, device=self.device)
+
+                # Накопление суммы признаков
+                sum_features += pool_val.sum(dim=0)  # [D]
+
+                # Накопление суммы внешних произведений
+                # pool_val.t() shape [D, B], => matmul => [D, D]
+                sum_features_squared += pool_val.t().mm(pool_val)
+                n_samples += B
+
+        # Итого считаем mean и cov
+        mean = sum_features / n_samples
+        # Bessel's correction => делим на (n_samples - 1).
+        # (S2 - S1*S1^T / N) / (N - 1)
+        # где:
+        #  S1 = sum_features, shape [D]
+        #  S2 = sum_features_squared, shape [D, D]
+        S2 = sum_features_squared
+        S1_outer = torch.outer(sum_features, sum_features)  # внешнее произведение -> [D, D]
+        cov = (S2 - S1_outer / n_samples) / (n_samples - 1)
+
+        return mean, cov
+    
