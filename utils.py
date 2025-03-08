@@ -6,6 +6,7 @@ from typing import Tuple, Literal
 import torch
 import torchvision
 import numpy as np
+import matplotlib.pyplot as plt
 
 from biggan import Generator, Discriminator
 
@@ -310,38 +311,58 @@ def sample_for_all_classes(G: Generator,
                            num_classes: int, 
                            samples_root: str, 
                            itr: int, 
-                           nrow=8):
-  """
-  Генерирует изображения для всех классов и сохраняет их в виде сетки.
+                           nrow=8,
+                           batch_size=10):
+    """
+    Генерирует изображения для всех классов, разделяя их на группы,
+    сохраняет их с подписями классов.
 
-  Параметры:
-  ----------
-  G : Generator
-      Генераторная модель.
-  num_classes : int
-      Количество классов для генерации.
-  samples_root : str
-      Путь к директории для сохранения сгенерированных изображений.
-  itr : int
-      Итерация, используется для именования файлов.
-  nrow : int, optional
-      Количество изображений в строке при сохранении (по умолчанию `8`).
-  """
-  path = os.path.join(samples_root, f"iter_{itr}")
-  os.makedirs(path, exist_ok=True)
+    Параметры:
+    ----------
+    G : Generator
+        Генераторная модель.
+    num_classes : int
+        Количество классов для генерации.
+    samples_root : str
+        Путь к директории для сохранения сгенерированных изображений.
+    itr : int
+        Итерация, используется для именования файлов.
+    nrow : int, optional
+        Количество изображений в строке при сохранении (по умолчанию `8`).
+    batch_size : int, optional
+        Максимальное число классов на одно изображение (по умолчанию `10`).
+    """
+    path = os.path.join(samples_root, f"iter_{itr}")
+    os.makedirs(path, exist_ok=True)
 
-  y = torch.arange(num_classes, device='cuda')
-  z = torch.randn(num_classes, G.dim_z, device='cuda')
-  
-  with torch.no_grad():
-      o = G(z, G.shared(y)).cpu()
-  
-  torchvision.utils.save_image(
-      o, 
-      os.path.join(path, "all_classes.jpg"),
-      nrow=nrow, 
-      normalize=True
-  )
+    for batch_idx in range(int(np.ceil(num_classes / batch_size))):
+        start_class = batch_idx * batch_size
+        end_class = min(start_class + batch_size, num_classes)
+        current_batch_size = end_class - start_class
+
+        y = torch.arange(start_class, end_class, device='cuda')
+        z = torch.randn(current_batch_size, G.dim_z, device='cuda')
+
+        with torch.no_grad():
+            images = G(z, G.shared(y)).cpu()
+
+        grid = torchvision.utils.make_grid(images, nrow=nrow, normalize=True)
+        grid_np = grid.permute(1, 2, 0).numpy()
+
+        plt.figure(figsize=(nrow * 2, int(np.ceil(current_batch_size / nrow)) * 2))
+        plt.imshow(grid_np)
+        plt.axis('off')
+
+        # Добавляем подписи классов
+        for idx in range(current_batch_size):
+            row, col = divmod(idx, nrow)
+            plt.text(col * images.size(3), row * images.size(2),
+                     str(start_class + idx), fontsize=12, color='white',
+                     bbox=dict(facecolor='black', alpha=0.7))
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(path, f"classes_{start_class}_to_{end_class - 1}.jpg"))
+        plt.close()
 
 
 def get_SVs(net: torch.nn.Module, 
