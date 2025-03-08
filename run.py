@@ -58,13 +58,13 @@ def run(path_to_config):
     resolution=config['resolution'], 
     n_classes=config['n_classes'], 
     **config['G']
-    ).to(device)
+  ).to(device)
   
   D = Discriminator(
     resolution=config['resolution'], 
     n_classes=config['n_classes'], 
     **config['D']
-    ).to(device)
+  ).to(device)
   
   gan = GAN(G, D)
   
@@ -82,7 +82,7 @@ def run(path_to_config):
     resolution=config['resolution'], 
     n_classes=config['n_classes'], 
     **G_ema_config
-    ).to(device)
+  ).to(device)
   
   G_ema.eval()
   
@@ -139,7 +139,7 @@ def run(path_to_config):
   # TRAIN LOOP #
   ##############
 
-  print("Begin training")
+  print("Start training")
 
   # Train for specified number of epochs, although we mostly track G iterations.
   for epoch in range(exp_state_dict['epoch'], config['train']['num_epochs']): 
@@ -153,9 +153,6 @@ def run(path_to_config):
       # For D, which typically doesn't have BN, this shouldn't matter much.
       G.train()
       D.train()
-      
-      if G_ema is not None:
-        G_ema.train()
 
       x, y = x.to(device), y.to(device)
 

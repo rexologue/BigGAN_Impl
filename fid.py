@@ -201,8 +201,8 @@ class FID:
         # Если статистики уже существуют, загружаем их
         if os.path.exists(data_mu_path) and os.path.exists(data_sigma_path):
             # Загружаем предвычисленные среднее и ковариационную матрицу 
-            self.data_mu = torch.load(data_mu_path).to(self.device)       # shape [D]
-            self.data_sigma = torch.load(data_sigma_path).to(self.device) # shape [D, D]
+            self.data_mu = torch.load(data_mu_path, weights_only=False).to(self.device)       # shape [D]
+            self.data_sigma = torch.load(data_sigma_path, weights_only=False).to(self.device) # shape [D, D]
         else:
             # Генерируем датасет реальных изображений для вычисления статистик
             loader = get_loader(config, 

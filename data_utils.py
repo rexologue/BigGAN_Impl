@@ -63,7 +63,7 @@ class Dataset(torch.utils.data.Dataset):
     img = Image.open(path).convert('RGB')  # Загружаем изображение и конвертируем в RGB
 
     if self.transforms is not None:
-        img = self.transforms(img)  # Применяем трансформации (если заданы)
+      img = self.transforms(img)  # Применяем трансформации (если заданы)
 
     return img, torch.tensor(target).long()
         
@@ -109,16 +109,16 @@ class Sampler(torch.utils.data.Sampler):
 
     # Загружаем или создаем индексы эпох
     if os.path.exists(self.path) and not random_use:
-        self.epochs_itrs = torch.load(self.path)
+      self.epochs_itrs = torch.load(self.path, weights_only=False)
     else:
-        self.epochs_itrs = [torch.randperm(self.num_samples) for _ in range(self.num_epochs)]
-        if not random_use:
-            torch.save(self.epochs_itrs, self.path)
+      self.epochs_itrs = [torch.randperm(self.num_samples) for _ in range(self.num_epochs)]
+      if not random_use:
+        torch.save(self.epochs_itrs, self.path)
 
     # Вычисляем текущую эпоху и итерацию
     current_epoch = self.start_itr // self.num_samples 
     if current_epoch >= self.num_epochs:
-        raise ValueError("start_itr превышает количество доступных эпох!")
+      raise ValueError("start_itr превышает количество доступных эпох!")
 
     current_itr = self.start_itr % self.num_samples  
 
