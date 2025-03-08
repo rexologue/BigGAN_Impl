@@ -101,15 +101,6 @@ class SpectralNorm:
             self.register_buffer(f'u{i}', torch.randn(1, num_outputs))
             self.register_buffer(f'sv{i}', torch.ones(1))
 
-    # Эти методы ожидаются при использовании этого класса вместе с nn.Module.
-    def register_buffer(self, name: str, tensor: torch.Tensor) -> None:
-        """
-        Заглушка, чтобы показать идею регистрации буферов.
-        На практике вы будете использовать метод nn.Module.register_buffer()
-        в собственном классе, унаследованном от nn.Module и SpectralNorm.
-        """
-        setattr(self, name, tensor)
-
     @property
     def u(self) -> List[torch.Tensor]:
         """

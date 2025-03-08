@@ -34,16 +34,6 @@ class EMA:
     self.decay = decay
     self.start_itr = start_itr  # Итерация, с которой начинается EMA
 
-    # Сохраняем параметры моделей
-    self.source_dict = self.source.state_dict()
-    self.target_dict = self.target.state_dict()
-
-    print('Initializing EMA parameters to be source parameters...')
-    with torch.no_grad():
-      for key in self.source_dict:
-          # Прямая подстановка не работает: target_dict[key].data = source_dict[key].data
-          self.target_dict[key].data.copy_(self.source_dict[key].data)
-
   def update(self, itr=None):
     """
     Обновляет параметры целевой модели EMA.
@@ -55,14 +45,21 @@ class EMA:
     itr : int, optional
         Текущая итерация обучения. Если `itr < start_itr`, обновление не выполняется.
     """
-    # Проверяем, должна ли EMA обновляться на данной итерации
-    if itr and itr < self.start_itr:
+    if itr is not None and itr < self.start_itr:
       decay = 0.0
     else:
       decay = self.decay
-    
+
     with torch.no_grad():
-      for key in self.source_dict:
-        self.target_dict[key].data.copy_(
-          self.target_dict[key].data * decay + self.source_dict[key].data * (1 - decay)
+      # Берем актуальный state_dict от self.source и self.target на каждой итерации
+      source_dict = self.source.state_dict()
+      target_dict = self.target.state_dict()
+      for key in source_dict:
+        target_dict[key].data.copy_(
+          target_dict[key].data * decay + source_dict[key].data * (1 - decay)
         )
+
+    # Обновляем 
+    self.target.load_state_dict(target_dict)
+
+    
