@@ -5,7 +5,8 @@ import os
 import shutil
 
 import torch
-import torchvision
+import numpy as np
+import matplotlib.pyplot as plt
 
 import fid
 import utils
@@ -235,7 +236,7 @@ def checkpoint(G: Generator,
     exp_state_dict['saved_ckps'] = exp_state_dict['saved_ckps'][2:]
 
 
-def sample(G_ema: Generator, 
+def sample(G: Generator,  
            fixed_z: torch.Tensor, 
            fixed_y: torch.Tensor, 
            exp_state_dict: dict, 
@@ -249,8 +250,8 @@ def sample(G_ema: Generator,
 
   Параметры:
   ----------
-  G_ema : Generator
-      Экспоненциально усреднённая версия генератора (EMA).
+  G : Generator
+      Генератор.
   fixed_z : torch.Tensor
       Фиксированный латентный вектор `z` для визуализации.
   fixed_y : torch.Tensor
@@ -262,25 +263,43 @@ def sample(G_ema: Generator,
   """
   # Генерация изображений с фиксированными `z` и `y`
   with torch.no_grad():
-    fixed_Gz = G_ema(fixed_z, G_ema.shared(fixed_y))
+    fixed_Gz = G(fixed_z, G.shared(fixed_y))
   
   image_filename = os.path.join(config['samples_root'], f"fixed_samples_{exp_state_dict['itr']}.jpg")
-  torchvision.utils.save_image(
-    fixed_Gz.float().cpu(), 
-    image_filename,
-    nrow=int(fixed_Gz.shape[0] ** 0.5), 
-    normalize=True
-  )
+
+  images = fixed_Gz.permute(0, 2, 3, 1).cpu().numpy()
+  images = np.clip(((images + 1) / 2.0) * 256, 0, 255)
+  images = np.asarray(np.uint8(images), dtype=np.uint8)
+
+  n_images = images.shape[0]
+
+  # Вычисляем размеры сетки для отображения всех изображений
+  cols = int(np.sqrt(n_images))
+  rows = int(np.ceil(n_images / cols))
+
+  fig, axes = plt.subplots(rows, cols, figsize=(cols * 3, rows * 3))
+  axes = axes.flatten()
+
+  for i in range(n_images):
+    axes[i].imshow(images[i])
+    axes[i].axis('off')
+
+  # Если субплотов больше, чем изображений, скрываем лишние
+  for ax in axes[n_images:]:
+    ax.axis('off')
+
+  plt.tight_layout()
+  plt.savefig(image_filename)
+  plt.close()
   
   # Генерация примеров изображений для всех классов
   utils.sample_for_all_classes(
-    G_ema,
+    G,
     config['n_classes'],
     config['samples_root'],
     exp_state_dict['itr']
   )
   
-
 
 def validate(G: Generator, 
              G_ema: Generator, 

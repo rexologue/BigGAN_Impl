@@ -78,10 +78,20 @@ def load_weights(G: Generator,
   - /load_path/D_opt.pth --- Веса оптимизатора дискриминатора
   """
   G.load_state_dict(torch.load(os.path.join(load_path, 'G.pth'), weights_only=False))
-  G_ema.load_state_dict(torch.load(os.path.join(load_path, 'G_ema.pth'), weights_only=False))
-  G.optim.load_state_dict(torch.load(os.path.join(load_path, 'G_opt.pth'), weights_only=False))
   D.load_state_dict(torch.load(os.path.join(load_path, 'D.pth'), weights_only=False))
-  D.optim.load_state_dict(torch.load(os.path.join(load_path, 'D_opt.pth'), weights_only=False))
+
+  g_opt_path = os.path.join(load_path, 'G_opt.pth')
+  d_opt_path = os.path.join(load_path, 'D_opt.pth')
+  gema_path = os.path.join(load_path, 'G_ema.pth')
+
+  if G_ema is not None and os.path.exists(gema_path):
+    G_ema.load_state_dict(torch.load(gema_path, weights_only=False))
+
+  if os.path.exists(g_opt_path):
+    G.optim.load_state_dict(torch.load(g_opt_path, weights_only=False))
+  
+  if os.path.exists(d_opt_path):
+    D.optim.load_state_dict(torch.load(d_opt_path, weights_only=False))
 
 
 def save_weigths(G: Generator, 
@@ -100,10 +110,12 @@ def save_weigths(G: Generator,
   - /save_path/D_opt.pth --- Веса оптимизатора дискриминатора
   """
   torch.save(G.state_dict(), os.path.join(save_path, 'G.pth'))
-  torch.save(G_ema.state_dict(), os.path.join(save_path, 'G_ema.pth'))
   torch.save(G.optim.state_dict(), os.path.join(save_path, 'G_opt.pth'))
   torch.save(D.state_dict(), os.path.join(save_path, 'D.pth'))
   torch.save(D.optim.state_dict(), os.path.join(save_path, 'D_opt.pth'))
+
+  if G_ema is not None:
+    torch.save(G_ema.state_dict(), os.path.join(save_path, 'G_ema.pth'))
 
 
 class MetricsLogger:

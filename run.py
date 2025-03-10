@@ -71,22 +71,26 @@ def run(path_to_config):
   ####################################
   # EXPONENTIAL MOVING AVERAGE MODEL #
   ####################################
-  print(f"Preparing EMA for G with decay of {config['ema']['decay']}")
+  if config.get('ema'):
+    print(f"Preparing EMA for G with decay of {config['ema']['decay']}")
 
-  G_ema_config = copy.deepcopy(config['G'])
+    G_ema_config = copy.deepcopy(config['G'])
 
-  G_ema_config['skip_init'] = True
-  G_ema_config['no_optim'] = True
+    G_ema_config['skip_init'] = True
+    G_ema_config['no_optim'] = True
 
-  G_ema = Generator(
-    resolution=config['resolution'], 
-    n_classes=config['n_classes'], 
-    **G_ema_config
-  ).to(device)
-  
-  G_ema.eval()
-  
-  ema = EMA(G, G_ema, config['ema']['decay'], config['ema']['start_itr'])
+    G_ema = Generator(
+      resolution=config['resolution'], 
+      n_classes=config['n_classes'], 
+      **G_ema_config
+    ).to(device)
+    
+    G_ema.eval()
+    
+    ema = EMA(G, G_ema, config['ema']['decay'], config['ema']['start_itr'])
+
+  else:
+    G_ema = None
 
   G_params = utils.count_parameters(G)
   D_params = utils.count_parameters(D)
@@ -120,15 +124,15 @@ def run(path_to_config):
   )
 
   # Prepare a fixed z & y to see individual sample evolution throghout training
-  fixed_z = z_.sample()
-  fixed_y = y_.sample()
+  fixed_z = z_.sample()[:config['train']['sample_batch_size']]
+  fixed_y = y_.sample()[:config['train']['sample_batch_size']]
 
   ##################
   # FID PREPARINGS #
   ##################
   sample_function = functools.partial(
     utils.sample,
-    G=G_ema,
+    G=(G_ema if G_ema is not None else G),
     z_=z_, 
     y_=y_
   )
@@ -170,7 +174,7 @@ def run(path_to_config):
 
       if not (exp_state_dict['itr'] % config['train']['sample_itr']):
         tu.sample(
-          G_ema=G_ema,
+          G=(G_ema if G_ema is not None else G),
           fixed_z=fixed_z, 
           fixed_y=fixed_y,
           exp_state_dict=exp_state_dict, 

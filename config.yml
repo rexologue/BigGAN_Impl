@@ -6,6 +6,7 @@ seed: 10
 experiment_root: /path/where/experiment/will/run
 pretrained_path: /path/to/pretrained/model
 
+# Could be omitted at all (if you don't want to use ema)
 ema:
   decay: 0.9999
   start_itr: 0
@@ -49,13 +50,18 @@ train:
   num_epochs: 10
   start_itr: 0
   batch_size: 16
+
   num_D_steps: 1
   num_D_accumulations: 8
   num_G_accumulations: 8
+
   save_itr: 10000
   eval_itr: 2000
-  sample_itr: 2
+  sample_itr: 10
   sv_log_interval: 5
+  sample_batch_size: 4
+
   num_inception_images: 50000
+
   G_ortho: 0.0
   D_ortho: 0.0
