@@ -48,7 +48,6 @@ D:
 
 train:
   num_epochs: 10
-  start_itr: 0
   batch_size: 16
 
   num_D_steps: 1
